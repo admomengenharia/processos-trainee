@@ -1,6 +1,10 @@
 # Painel de Trainees
 
-Site que lê os dados direto de uma planilha do Google Sheets — você atualiza a planilha de qualquer celular ou computador, e o site reflete sozinho, sem precisar mexer em código.
+Site que lê e grava direto numa planilha do Google Sheets. Adicionar, editar ou remover um processo pelo site (em qualquer dispositivo) atualiza a planilha de verdade — e qualquer outro dispositivo que abrir o site depois já vê a mudança.
+
+Isso funciona com duas peças separadas:
+- **Leitura**: a planilha publicada como CSV (rápido, sem login).
+- **Escrita**: um pequeno script (Google Apps Script) que roda dentro da própria planilha e recebe os pedidos de adicionar/editar/remover do site.
 
 ## Passo 1 — Coloque a planilha no Google Sheets
 
@@ -8,59 +12,55 @@ Site que lê os dados direto de uma planilha do Google Sheets — você atualiza
 2. Clique com o botão direito no arquivo → **Abrir com → Google Sheets**. Isso cria uma cópia editável no Sheets (o `.xlsx` original fica intacto no Drive).
 3. Confira a aba **Leia-me** dentro da planilha — ela explica cada coluna.
 
-## Passo 2 — Publique a planilha como CSV
+## Passo 2 — Publique a planilha como CSV (leitura)
 
 1. No Google Sheets, vá em **Arquivo → Compartilhar → Publicar na Web**.
 2. Em "Link", selecione a aba **Trainees** (não "Documento inteiro").
 3. Em formato, escolha **Valores separados por vírgula (.csv)**.
 4. Clique em **Publicar** e confirme.
-5. Copie o link gerado (algo como `https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?output=csv`).
+5. Copie o link gerado.
+6. No `index.html`, cole esse link na linha `const SHEET_CSV_URL = "...";`.
 
-## Passo 3 — Conecte o link ao site
+## Passo 3 — Instale o backend de escrita (Apps Script)
 
-1. Abra o arquivo `index.html` em qualquer editor de texto.
-2. Procure a linha:
-   ```js
-   const SHEET_CSV_URL = "COLE_AQUI_O_LINK_CSV_DA_SUA_PLANILHA";
-   ```
-3. Substitua o texto entre aspas pelo link que você copiou no Passo 2.
-4. Salve o arquivo.
+1. Na mesma planilha, vá em **Extensões → Apps Script**.
+2. Apague qualquer código padrão que já esteja lá.
+3. Abra o arquivo `apps-script.gs` (incluído aqui) e cole todo o conteúdo no editor do Apps Script.
+4. Salve o projeto (ícone de disquete).
+5. Clique em **Implantar → Nova implantação**.
+6. Clique na engrenagem ao lado de "Selecionar tipo" → escolha **App da Web**.
+7. Em "Executar como": **Eu (seu e-mail)**. Em "Quem pode acessar": **Qualquer pessoa**.
+8. Clique em **Implantar**. Vai pedir autorização — é normal aparecer um aviso de "app não verificado" (porque é um script seu, não publicado por ninguém); clique em **Avançado** → **Acessar [nome do projeto] (não seguro)** → **Permitir**. É seguro porque é o seu próprio script agindo na sua própria planilha.
+9. Copie a **URL do app da Web** (termina em `/exec`).
+10. No `index.html`, cole esse link na linha `const APPS_SCRIPT_URL = "...";`.
+
+**Atenção:** se você editar o código do Apps Script de novo no futuro, precisa criar uma **nova versão** (Implantar → Gerenciar implantações → ícone de lápis → Versão: Nova versão → Implantar) para a mudança valer. Só salvar o arquivo não é suficiente.
 
 ## Passo 4 — Publique no GitHub Pages
 
 1. Crie um repositório novo no GitHub.
-2. Suba o `index.html` (com o link já colado) para a raiz do repositório.
+2. Suba o `index.html` (já com os dois links colados) para a raiz do repositório.
 3. Vá em **Settings → Pages**, escolha **Deploy from a branch**, branch **main**, pasta **/ (root)**, salve.
 4. Em cerca de 1 minuto o site estará em `https://SEU-USUARIO.github.io/NOME-DO-REPO/`.
 
 ## Como usar no dia a dia
 
-A partir daqui, **você nunca mais precisa editar o `index.html`**. Todo o acompanhamento acontece na planilha, direto do Google Sheets (app do celular ou navegador):
+Tudo pode ser feito direto pelo site agora, em qualquer dispositivo:
 
-- **Status**: mude para Inscrito, Em teste, Entrevista, Case, Aprovado, Reprovado ou Desistiu (use o menu suspenso da célula).
-- **Fase Atual**: escreva a etapa em que você está agora (ex: "Teste de lógica", "Dinâmica em grupo").
-- **Link da Fase**: cole o link do teste/formulário/reunião dessa etapa.
-- **Prazo da Fase**: data limite para concluir essa etapa — é isso que aparece na contagem regressiva do site.
-- **Notas**: qualquer comentário livre sobre o processo.
+- **+ Adicionar processo** — abre um formulário e grava uma linha nova na planilha.
+- **Editar** (em cada card) — muda Encaixe, Status, prazos, links, Fase Atual e Notas, e grava por cima da linha existente.
+- **×** (em cada card) — apaga a linha da planilha de verdade (pede confirmação, porque não tem como desfazer).
 
-Basta abrir o site depois (em qualquer dispositivo) e clicar em **Atualizar** — ele busca a versão mais recente da planilha automaticamente.
+Depois de qualquer uma dessas ações, o site mostra "Salvando na planilha…" e recarrega sozinho após ~2-3 segundos com o dado já confirmado. Se quiser forçar uma atualização, o botão **Atualizar** no topo sempre busca a versão mais recente.
 
-## Adicionar ou remover processos direto no site
-
-O botão **"+ Adicionar processo"** no topo do site abre um formulário para cadastrar um novo processo sem precisar abrir a planilha. O **×** no canto de cada card remove aquele processo da visualização.
-
-Importante entender como isso funciona: como o site é uma página estática (sem servidor próprio), essas ações ficam salvas **só neste navegador/dispositivo** (usando localStorage):
-
-- **Adicionar pelo site** → o card aparece com a etiqueta "Somente aqui". Para esse processo também aparecer em outros dispositivos, clique em **"Copiar linha para a planilha"** no rodapé do card — isso copia os dados no formato certo para você colar direto numa nova linha da planilha do Google Sheets.
-- **Remover pelo site** → se o processo veio da planilha, ele só fica oculto neste navegador (a linha continua existindo na planilha). Um contador aparece no fim da lista ("X ocultado(s) neste navegador") onde dá para restaurar. Para apagar de vez e em todos os dispositivos, apague a linha na própria planilha.
-- Se você adicionou um processo pelo site (ainda não copiado pra planilha) e depois clica em remover, ele é apagado de verdade — não fica na lista de ocultados.
-
-Ou seja: **a planilha continua sendo a fonte "oficial" e multi-dispositivo**; os botões do site são um atalho rápido para o dispositivo que você está usando no momento.
+Você também pode continuar editando a planilha direto pelo Google Sheets (app do celular ou navegador) a qualquer momento — as duas formas convivem bem, já que ambas mexem na mesma planilha.
 
 ## Filtro por prazo
 
 Os campos "Prazo de ... até ..." acima da lista filtram os processos pela data relevante de cada um (prazo da fase atual, ou prazo de inscrição quando não há fase definida). Útil para perguntas como "o que vence entre hoje e sexta-feira?". Botão "limpar" reseta o filtro.
 
-### Observação sobre o "Publicar na Web"
+## Sobre privacidade e segurança
 
-O link publicado é público para quem o possui (não aparece em buscas, mas qualquer pessoa com o link consegue ver os dados em modo leitura). Se preferir mais privacidade, publique mesmo assim — é só não divulgar o link do CSV, só o link do site.
+- O link do CSV publicado é acessível por qualquer pessoa que o tenha (não aparece em buscas, mas não tem senha).
+- O link do Apps Script, configurado com acesso "Qualquer pessoa", também não pede login — qualquer um que descubra essa URL poderia enviar alterações para a planilha. Como ela só fica visível dentro do código-fonte do seu site (não é anunciada em lugar nenhum), o risco prático é baixo para um painel pessoal como este, mas vale saber que ela não tem autenticação.
+- Se em algum momento isso incomodar, dá para restringir o "Quem pode acessar" do Apps Script para "Qualquer pessoa com Google" — só que aí o site precisaria de um passo extra de login para gravar, o que foge do escopo deste painel simples.

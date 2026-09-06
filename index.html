@@ -446,7 +446,7 @@
 
   <section class="add-panel" id="addPanel">
     <h3>Novo processo</h3>
-    <p class="hint">Fica salvo neste navegador. Use "Copiar linha para a planilha" no card depois de adicionar para também salvar na planilha e ver em outros dispositivos.</p>
+    <p class="hint">Salvo direto na planilha — aparece em qualquer dispositivo em poucos segundos.</p>
     <form id="addForm">
       <div class="add-grid">
         <div class="full">
@@ -510,19 +510,24 @@
 
   <main id="lista"><div class="state-box"><h3>Carregando planilha…</h3></div></main>
 
-  <div class="hidden-box" id="hiddenBox"></div>
-
-  <footer class="note">Fonte dos dados: planilha do Google Sheets configurada em <code>SHEET_CSV_URL</code>. Processos adicionados ou removidos por aqui ficam salvos neste navegador.</footer>
+  <footer class="note">Alterações feitas aqui (adicionar, editar, remover) são salvas direto na planilha e aparecem em qualquer dispositivo em poucos segundos.</footer>
 
 </div>
 
 <script>
   // ============================================================
-  // COLE AQUI O LINK "PUBLICAR NA WEB" (formato CSV) DA SUA PLANILHA
+  // 1) LEITURA — link "Publicar na Web" (formato CSV) da planilha
   // Google Sheets: Arquivo > Compartilhar > Publicar na web > aba
   // "Trainees" > formato CSV > Publicar > copiar o link e colar abaixo.
   // ============================================================
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRKaGPcusc2qrzMk9xmVGNFJih2AeQ92t6g0EhVdfCLhrmSbtHi3v78Iti-834sZ01CBTdMsbLRqkND/pub?gid=1539998115&single=true&output=csv";
+
+  // ============================================================
+  // 2) ESCRITA — link do Google Apps Script Web App (para
+  // adicionar, editar e remover processos direto pelo site).
+  // Veja o README para o passo a passo de como gerar esse link.
+  // ============================================================
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzZ8V08NLMeoqh8B3DL-dwd4ZjwlbJVDPPsjilbjxTeYWGoRnJ7zvCt_c3cF6sLKoVm/exec";
 
   const STATUS_STYLE = {
     'pendente':   { color: 'var(--amber)', bg: 'var(--amber-bg)', group: 'pendente' },
@@ -536,9 +541,25 @@
     'desistiu':   { color: 'var(--grey)',  bg: 'var(--grey-bg)',  group: 'finalizado' },
   };
   const FIT_COLOR = { alto: 'var(--teal)', medio: 'var(--amber)', baixo: 'var(--red)', 'a confirmar': 'var(--grey)' };
+  const STATUS_OPTIONS = ['Pendente','Inscrito','Em teste','Entrevista','Case','Aguardando resultado','Aprovado','Reprovado','Desistiu'];
+  const FIT_OPTIONS = ['Alto','Medio','Baixo','A confirmar'];
 
   let dados = [];
   let filtroAtual = 'todos';
+  let editingSet = new Set();
+
+  function escAttr(s){ return String(s == null ? '' : s).replace(/"/g, '&quot;'); }
+  function escHtml(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function toInputDate(dt){
+    if (!dt) return '';
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth()+1).padStart(2,'0');
+    const d = String(dt.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  function buildOptions(options, current){
+    return options.map(o => `<option value="${o}" ${o.toLowerCase() === String(current||'').toLowerCase() ? 'selected' : ''}>${o}</option>`).join('');
+  }
 
   function parseFlexDate(v){
     if (!v) return null;
@@ -610,58 +631,36 @@
       prazoFase,
       prazoOrdenacao: prazoRelevante,
       notas: row['Notas'] || '',
-      _raw: row,
     };
   }
 
-  const SHEET_COLUMNS = ['Programa','Encaixe','Status','Prazo de Inscricao','Link de Inscricao','Fase Atual','Link da Fase','Prazo da Fase','Notas'];
+  // ---------- Gravação na planilha (via Apps Script Web App) ----------
 
-  function rowToTSV(raw){
-    const get = (k, alt) => {
-      const v = raw[k];
-      if (v !== undefined && v !== null && String(v).trim() !== '') return v;
-      return (alt && raw[alt]) || '';
-    };
-    return [
-      get('Programa'),
-      get('Encaixe'),
-      get('Status'),
-      get('Prazo de Inscricao', 'Prazo de Inscrição'),
-      get('Link de Inscricao', 'Link de Inscrição'),
-      get('Fase Atual'),
-      get('Link da Fase'),
-      get('Prazo da Fase'),
-      get('Notas'),
-    ].join('\t');
+  function scriptConfigured(){
+    return APPS_SCRIPT_URL && APPS_SCRIPT_URL.indexOf('COLE_AQUI') === -1;
   }
 
-  const OVERLAY_ADDED_KEY = 'trainee-overlay-added';
-  const OVERLAY_REMOVED_KEY = 'trainee-overlay-removed';
-
-  function loadOverlay(){
-    let added = [], removed = [];
-    try { added = JSON.parse(localStorage.getItem(OVERLAY_ADDED_KEY) || '[]'); } catch(e){}
-    try { removed = JSON.parse(localStorage.getItem(OVERLAY_REMOVED_KEY) || '[]'); } catch(e){}
-    return { added, removed };
+  function salvarNoServidor(action, payload){
+    if (!scriptConfigured()){
+      alert('Para adicionar, editar ou remover processos direto pelo site, primeiro configure o APPS_SCRIPT_URL no index.html. Veja o README para o passo a passo.');
+      return false;
+    }
+    // mode:'no-cors' evita o bloqueio de CORS do Apps Script, mas também
+    // impede ler a resposta — por isso recarregamos a planilha logo em seguida.
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action: action }, payload)),
+    }).catch(function(){ /* resposta opaca por causa do no-cors; erros de rede reais são raros aqui */ });
+    return true;
   }
-  function saveOverlay(){
-    localStorage.setItem(OVERLAY_ADDED_KEY, JSON.stringify(overlay.added));
-    localStorage.setItem(OVERLAY_REMOVED_KEY, JSON.stringify(overlay.removed));
+
+  function statusSalvando(texto){
+    document.getElementById('syncStatus').textContent = texto;
   }
 
-  let overlay = loadOverlay();
-  let dadosSheet = [];
-
-  function recombine(){
-    const removedSet = new Set(overlay.removed.map(s => s.toLowerCase()));
-    const fromSheet = dadosSheet.filter(p => !removedSet.has(p.programa.toLowerCase()));
-    const fromLocal = overlay.added.map(row => {
-      const entry = normalizeRow(row);
-      entry.isLocal = true;
-      return entry;
-    });
-    dados = fromSheet.concat(fromLocal);
-  }
+  // ---------- Renderização ----------
 
   function render(){
     const lista = document.getElementById('lista');
@@ -699,7 +698,59 @@
       const fitColor = FIT_COLOR[p.encaixe] || 'var(--grey)';
       const linkPrincipal = p.linkFase || p.linkInscricao;
       const mostrarLinkSecundario = p.linkInscricao && p.linkFase && p.linkInscricao !== p.linkFase;
-      const nomeAttr = p.programa.replace(/"/g, '&quot;');
+      const nomeAttr = escAttr(p.programa);
+
+      if (editingSet.has(p.programa)){
+        return `
+          <article class="entry" style="--accent:${style.color}">
+            <div class="entry-top">
+              <span class="pill" style="background:${style.bg};color:${style.color}">${p.statusLabel}</span>
+              <span class="pill fit" style="color:${fitColor}">${p.encaixeLabel}</span>
+            </div>
+            <h2 class="entry-title">${p.programa}</h2>
+            <form class="edit-form" data-programa="${nomeAttr}">
+              <div class="add-grid">
+                <div>
+                  <label>Encaixe</label>
+                  <select name="encaixe">${buildOptions(FIT_OPTIONS, p.encaixeLabel)}</select>
+                </div>
+                <div>
+                  <label>Status</label>
+                  <select name="status">${buildOptions(STATUS_OPTIONS, p.statusLabel)}</select>
+                </div>
+                <div>
+                  <label>Prazo de inscrição</label>
+                  <input type="date" name="prazoInscricao" value="${toInputDate(p.prazoInscricao)}">
+                </div>
+                <div>
+                  <label>Link de inscrição</label>
+                  <input type="url" name="linkInscricao" value="${escAttr(p.linkInscricao)}" placeholder="https://">
+                </div>
+                <div>
+                  <label>Fase atual</label>
+                  <input type="text" name="faseAtual" value="${escAttr(p.faseAtual)}">
+                </div>
+                <div>
+                  <label>Prazo da fase</label>
+                  <input type="date" name="prazoFase" value="${toInputDate(p.prazoFase)}">
+                </div>
+                <div class="full">
+                  <label>Link da fase</label>
+                  <input type="url" name="linkFase" value="${escAttr(p.linkFase)}" placeholder="https://">
+                </div>
+                <div class="full">
+                  <label>Notas</label>
+                  <textarea name="notas">${escHtml(p.notas)}</textarea>
+                </div>
+              </div>
+              <div class="add-actions">
+                <button type="submit" class="btn-primary" style="border:none;cursor:pointer;">Salvar</button>
+                <button type="button" class="btn-secondary cancel-edit-btn" data-programa="${nomeAttr}">Cancelar</button>
+              </div>
+            </form>
+          </article>
+        `;
+      }
 
       return `
         <article class="entry" style="--accent:${style.color}">
@@ -708,8 +759,7 @@
             <span class="pill fit" style="color:${fitColor}">${p.encaixeLabel}</span>
             <div class="entry-top-right">
               ${countdownHTML(dias)}
-              ${p.isLocal ? '<span class="local-badge">Somente aqui</span>' : ''}
-              <button class="delete-btn" data-programa="${nomeAttr}" data-local="${p.isLocal ? '1':'0'}" title="Remover" aria-label="Remover ${nomeAttr}">×</button>
+              <button class="delete-btn" data-programa="${nomeAttr}" title="Remover" aria-label="Remover ${nomeAttr}">×</button>
             </div>
           </div>
           <h2 class="entry-title">${p.programa}</h2>
@@ -727,11 +777,11 @@
               <div class="value muted">${p.prazoInscricao ? fmtDate(p.prazoInscricao) : '—'}</div>
             </div>
           </div>
-          ${p.notas ? `<div class="notes">${p.notas}</div>` : ''}
+          ${p.notas ? `<div class="notes">${escHtml(p.notas)}</div>` : ''}
           <div class="entry-footer">
             ${linkPrincipal ? `<a class="btn-primary" href="${linkPrincipal}" target="_blank" rel="noopener">Abrir</a>` : ''}
             ${mostrarLinkSecundario ? `<a class="link-secondary" href="${p.linkInscricao}" target="_blank" rel="noopener">Inscrição original</a>` : ''}
-            ${p.isLocal ? `<button class="link-secondary copy-row-btn" data-tsv="${encodeURIComponent(rowToTSV(p._raw))}" style="background:none;border:none;cursor:pointer;">Copiar linha para a planilha</button>` : ''}
+            <button class="link-secondary edit-btn" data-programa="${nomeAttr}" style="background:none;border:none;cursor:pointer;">Editar</button>
           </div>
         </article>
       `;
@@ -756,6 +806,8 @@
       </div>
     `;
   }
+
+  // ---------- Interações ----------
 
   document.querySelectorAll('#tabs button').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -798,79 +850,64 @@
       'Prazo da Fase': fd.get('prazoFase') || '',
       'Notas': fd.get('notas') || '',
     };
-    overlay.added.push(row);
-    saveOverlay();
-    recombine();
-    render();
-    renderSummary();
-    renderHiddenBox();
+    if (!salvarNoServidor('add', { row })) return;
     e.target.reset();
     document.getElementById('addPanel').classList.remove('open');
+    statusSalvando('Salvando na planilha…');
+    setTimeout(carregar, 2500);
   });
-
-  function renderHiddenBox(){
-    const box = document.getElementById('hiddenBox');
-    if (!overlay.removed.length){ box.innerHTML = ''; return; }
-    box.innerHTML = `
-      <button class="toggle" id="hiddenToggle">${overlay.removed.length} ocultado(s) neste navegador</button>
-      <div class="hidden-list" id="hiddenList">
-        ${overlay.removed.map(nome => `
-          <div class="hidden-item">
-            <span>${nome}</span>
-            <button data-restore="${nome.replace(/"/g,'&quot;')}">Restaurar</button>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    document.getElementById('hiddenToggle').addEventListener('click', () => {
-      document.getElementById('hiddenList').classList.toggle('open');
-    });
-    box.querySelectorAll('[data-restore]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const nome = btn.dataset.restore;
-        overlay.removed = overlay.removed.filter(x => x !== nome);
-        saveOverlay();
-        recombine();
-        render();
-        renderSummary();
-        renderHiddenBox();
-      });
-    });
-  }
 
   document.getElementById('lista').addEventListener('click', function(e){
     const delBtn = e.target.closest('.delete-btn');
     if (delBtn){
       const nome = delBtn.dataset.programa;
-      const isLocal = delBtn.dataset.local === '1';
-      if (isLocal){
-        overlay.added = overlay.added.filter(r => (r['Programa'] || '') !== nome);
-      } else if (!overlay.removed.some(x => x.toLowerCase() === nome.toLowerCase())){
-        overlay.removed.push(nome);
-      }
-      saveOverlay();
-      recombine();
+      if (!confirm(`Remover "${nome}" da planilha? Essa ação vale para todos os dispositivos e não pode ser desfeita.`)) return;
+      if (!salvarNoServidor('delete', { programa: nome })) return;
+      dados = dados.filter(p => p.programa !== nome);
       render();
       renderSummary();
-      renderHiddenBox();
+      statusSalvando('Removendo da planilha…');
+      setTimeout(carregar, 2500);
       return;
     }
-    const copyBtn = e.target.closest('.copy-row-btn');
-    if (copyBtn){
-      const text = decodeURIComponent(copyBtn.dataset.tsv);
-      const done = () => {
-        const old = copyBtn.textContent;
-        copyBtn.textContent = 'Copiado!';
-        setTimeout(() => { copyBtn.textContent = old; }, 1500);
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(text).then(done).catch(() => alert('Não consegui copiar automaticamente. Copie manualmente:\n\n' + text));
-      } else {
-        alert('Copie manualmente esta linha (cole em uma nova linha da planilha):\n\n' + text);
-      }
+    const editBtn = e.target.closest('.edit-btn');
+    if (editBtn){
+      editingSet.add(editBtn.dataset.programa);
+      render();
+      return;
+    }
+    const cancelBtn = e.target.closest('.cancel-edit-btn');
+    if (cancelBtn){
+      editingSet.delete(cancelBtn.dataset.programa);
+      render();
       return;
     }
   });
+
+  document.getElementById('lista').addEventListener('submit', function(e){
+    const form = e.target.closest('.edit-form');
+    if (!form) return;
+    e.preventDefault();
+    const programaOriginal = form.dataset.programa;
+    const fd = new FormData(form);
+    const novoRaw = {
+      'Encaixe': fd.get('encaixe') || 'A confirmar',
+      'Status': fd.get('status') || 'Pendente',
+      'Prazo de Inscricao': fd.get('prazoInscricao') || '',
+      'Link de Inscricao': fd.get('linkInscricao') || '',
+      'Fase Atual': fd.get('faseAtual') || '',
+      'Link da Fase': fd.get('linkFase') || '',
+      'Prazo da Fase': fd.get('prazoFase') || '',
+      'Notas': fd.get('notas') || '',
+    };
+    if (!salvarNoServidor('edit', { programa: programaOriginal, row: novoRaw })) return;
+    editingSet.delete(programaOriginal);
+    render();
+    statusSalvando('Salvando na planilha…');
+    setTimeout(carregar, 2500);
+  });
+
+  // ---------- Estados de carregamento ----------
 
   function showSetupInstructions(){
     document.getElementById('lista').innerHTML = `
@@ -878,7 +915,7 @@
         <h3>Falta conectar a planilha</h3>
         <p>Esta página busca os dados de uma planilha do Google Sheets publicada como CSV. Para configurar:</p>
         <ol>
-          <li>Abra sua planilha <code>pauta-trainees.xlsx</code> no Google Sheets.</li>
+          <li>Abra sua planilha no Google Sheets.</li>
           <li>Vá em <strong>Arquivo → Compartilhar → Publicar na web</strong>.</li>
           <li>Selecione a aba <strong>Trainees</strong> e o formato <strong>CSV</strong>, depois clique em Publicar.</li>
           <li>Copie o link gerado.</li>
@@ -918,13 +955,11 @@
           showError('A planilha respondeu, mas não retornou nenhuma linha de dados.');
           return;
         }
-        dadosSheet = results.data
+        dados = results.data
           .filter(r => r['Programa'] && r['Programa'].trim())
           .map(normalizeRow);
-        recombine();
         render();
         renderSummary();
-        renderHiddenBox();
         document.getElementById('syncStatus').textContent =
           'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       },
