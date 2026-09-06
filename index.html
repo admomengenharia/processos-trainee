@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Trainees — Thiago Meloni Tavares</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg: #F3F4F0;
+    --surface: #FFFFFF;
+    --ink: #14171A;
+    --ink-soft: #5B6169;
+    --ink-faint: #8B9096;
+    --line: #E4E5E0;
+
+    --teal: #0E7A5F;
+    --teal-bg: #DEF0E9;
+    --amber: #A9701E;
+    --amber-bg: #FBEED2;
+    --blue: #2A5DB0;
+    --blue-bg: #E1EAFB;
+    --red: #B0392F;
+    --red-bg: #F8E3DF;
+    --grey: #6B6F73;
+    --grey-bg: #E9EAE6;
+  }
+
+  *{ box-sizing: border-box; }
+  html{ background: var(--bg); }
+
+  body{
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Manrope', -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a{ color: inherit; text-decoration: none; }
+  :focus-visible{ outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .wrap{ max-width: 760px; margin: 0 auto; padding: 44px 20px 90px; }
+
+  /* ---------- Header ---------- */
+
+  header{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: rise .5s ease-out forwards;
+  }
+
+  h1{
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: -.01em;
+    margin: 0 0 6px;
+  }
+
+  .subhead{ font-size: 14.5px; color: var(--ink-soft); max-width: 46ch; }
+
+  .sync-box{ text-align: right; font-size: 12.5px; color: var(--ink-faint); flex-shrink: 0; }
+
+  #refreshBtn{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  #refreshBtn svg{ width: 13px; height: 13px; transition: transform .5s ease; }
+  #refreshBtn.spinning svg{ transform: rotate(360deg); }
+
+  /* ---------- Summary ---------- */
+
+  .summary{
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+    opacity: 0;
+    animation: rise .5s ease-out .08s forwards;
+  }
+  .stat{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 18px;
+    flex: 1 1 120px;
+  }
+  .stat .num{ font-family: 'Fraunces', serif; font-weight: 600; font-size: 24px; line-height: 1; display: block; margin-bottom: 3px; }
+  .stat .label{ font-size: 12px; color: var(--ink-soft); }
+  .stat.next{ flex: 2 1 260px; }
+  .stat.next .label{ margin-bottom: 3px; display: block; }
+  .stat.next .num{ font-size: 16px; }
+  .stat.next strong{ color: var(--teal); }
+
+  /* ---------- Filters ---------- */
+
+  .tabs{
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .tabs button{
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+  .tabs button.active{ background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .filters-row{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .date-filter{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    flex-wrap: wrap;
+  }
+  .date-filter input[type="date"]{
+    font: inherit;
+    font-size: 12.5px;
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .date-filter button{
+    font: inherit;
+    font-size: 12px;
+    color: var(--ink-faint);
+    background: none;
+    border: none;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  #addToggleBtn{
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--ink);
+    color: #fff;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  #addToggleBtn:hover{ background: var(--teal); }
+
+  .add-panel{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .add-panel.open{ display: block; }
+  .add-panel h3{ font-family: 'Fraunces', serif; font-size: 17px; margin: 0 0 4px; }
+  .add-panel .hint{ font-size: 12.5px; color: var(--ink-faint); margin: 0 0 14px; }
+  .add-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 14px;
+  }
+  .add-grid .full{ grid-column: 1 / -1; }
+  .add-grid label{ font-size: 11.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .03em; display: block; margin-bottom: 4px; }
+  .add-grid input, .add-grid select, .add-grid textarea{
+    width: 100%;
+    font: inherit;
+    font-size: 13.5px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .add-grid textarea{ resize: vertical; min-height: 42px; }
+  .add-actions{ display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+  .btn-secondary{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .entry-top-right{ margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  .local-badge{
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--blue);
+    background: var(--blue-bg);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+
+  .delete-btn{
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-faint);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .delete-btn:hover{ background: var(--red-bg); color: var(--red); border-color: var(--red-bg); }
+
+  .hidden-box{ margin-top: 14px; font-size: 12.5px; color: var(--ink-faint); }
+  .hidden-box .toggle{
+    background: none; border: none; color: var(--ink-soft);
+    text-decoration: underline; cursor: pointer; font: inherit; font-size: 12.5px; padding: 0;
+  }
+  .hidden-list{ margin-top: 8px; display: none; }
+  .hidden-list.open{ display: block; }
+  .hidden-item{
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px dashed var(--line);
+    font-size: 13px; color: var(--ink-soft);
+  }
+  .hidden-item button{
+    font: inherit; font-size: 12px; font-weight: 600; color: var(--teal);
+    background: none; border: none; cursor: pointer;
+  }
+
+  /* ---------- Cards ---------- */
+
+  .entry{
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px 18px 22px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: box-shadow .18s ease, transform .18s ease;
+  }
+  .entry:hover{ box-shadow: 0 6px 20px rgba(20,23,26,.06); transform: translateY(-1px); }
+  .entry::before{
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 5px;
+    background: var(--accent, var(--grey));
+  }
+
+  .entry-top{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .pill{
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+    letter-spacing: .01em;
+  }
+  .pill.fit{ background: transparent; border: 1.2px solid currentColor; font-weight: 600; }
+
+  .countdown{ font-size: 12px; color: var(--ink-soft); }
+  .countdown.urgent{ color: var(--red); font-weight: 700; }
+  .countdown.closed{ color: var(--ink-faint); }
+
+  h2.entry-title{
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: 19.5px;
+    margin: 0 0 10px;
+  }
+
+  .meta-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .meta-grid .label{ color: var(--ink-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+  .meta-grid .value{ color: var(--ink); }
+  .meta-grid .value.muted{ color: var(--ink-soft); }
+
+  .notes{
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-left: 3px solid var(--line);
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  .entry-footer{
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .btn-primary{
+    background: var(--ink);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+  }
+  .btn-primary:hover{ background: var(--teal); }
+  .link-secondary{
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-underline-offset: 3px;
+  }
+
+  /* ---------- States ---------- */
+
+  .state-box{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px 26px;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .state-box h3{ font-family: 'Fraunces', serif; font-size: 19px; margin: 0 0 10px; }
+  .state-box code{
+    background: var(--grey-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+  .state-box ol{ padding-left: 20px; }
+  .state-box li{ margin-bottom: 6px; }
+
+  footer.note{
+    margin-top: 34px;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    header, .summary{ animation: none; opacity: 1; }
+    .entry{ transition: none; }
+    #refreshBtn svg{ transition: none; }
+  }
+  @keyframes rise{ from{ opacity: 0; transform: translateY(6px); } to{ opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 560px){
+    h1{ font-size: 27px; }
+    header{ flex-direction: column; align-items: flex-start; }
+    .sync-box{ text-align: left; }
+    .meta-grid{ grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Painel de Trainees</h1>
+      <p class="subhead">Candidaturas de Thiago Meloni Tavares, atualizadas direto da planilha.</p>
+    </div>
+    <div class="sync-box">
+      <div id="syncStatus">carregando…</div>
+      <button id="refreshBtn" aria-label="Atualizar dados">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        Atualizar
+      </button>
+    </div>
+  </header>
+
+  <section class="summary" id="summary"></section>
+
+  <div class="filters-row">
+    <nav class="tabs" id="tabs">
+      <button class="active" data-filter="todos">Todos</button>
+      <button data-filter="pendente">Pendentes</button>
+      <button data-filter="andamento">Em andamento</button>
+      <button data-filter="finalizado">Finalizados</button>
+    </nav>
+    <button id="addToggleBtn">+ Adicionar processo</button>
+  </div>
+
+  <div class="date-filter">
+    <label>Prazo de <input type="date" id="filtroDe"></label>
+    <label>até <input type="date" id="filtroAte"></label>
+    <button id="limparFiltroData">limpar</button>
+  </div>
+
+  <section class="add-panel" id="addPanel">
+    <h3>Novo processo</h3>
+    <p class="hint">Fica salvo neste navegador. Use "Copiar linha para a planilha" no card depois de adicionar para também salvar na planilha e ver em outros dispositivos.</p>
+    <form id="addForm">
+      <div class="add-grid">
+        <div class="full">
+          <label for="f_programa">Programa *</label>
+          <input type="text" id="f_programa" name="programa" required>
+        </div>
+        <div>
+          <label for="f_encaixe">Encaixe</label>
+          <select id="f_encaixe" name="encaixe">
+            <option>Alto</option>
+            <option>Medio</option>
+            <option selected>A confirmar</option>
+            <option>Baixo</option>
+          </select>
+        </div>
+        <div>
+          <label for="f_status">Status</label>
+          <select id="f_status" name="status">
+            <option selected>Pendente</option>
+            <option>Inscrito</option>
+            <option>Em teste</option>
+            <option>Entrevista</option>
+            <option>Case</option>
+            <option>Aguardando resultado</option>
+            <option>Aprovado</option>
+            <option>Reprovado</option>
+            <option>Desistiu</option>
+          </select>
+        </div>
+        <div>
+          <label for="f_prazoInscricao">Prazo de inscrição</label>
+          <input type="date" id="f_prazoInscricao" name="prazoInscricao">
+        </div>
+        <div>
+          <label for="f_linkInscricao">Link de inscrição</label>
+          <input type="url" id="f_linkInscricao" name="linkInscricao" placeholder="https://">
+        </div>
+        <div>
+          <label for="f_faseAtual">Fase atual</label>
+          <input type="text" id="f_faseAtual" name="faseAtual">
+        </div>
+        <div>
+          <label for="f_prazoFase">Prazo da fase</label>
+          <input type="date" id="f_prazoFase" name="prazoFase">
+        </div>
+        <div class="full">
+          <label for="f_linkFase">Link da fase</label>
+          <input type="url" id="f_linkFase" name="linkFase" placeholder="https://">
+        </div>
+        <div class="full">
+          <label for="f_notas">Notas</label>
+          <textarea id="f_notas" name="notas"></textarea>
+        </div>
+      </div>
+      <div class="add-actions">
+        <button type="submit" class="btn-primary" style="border:none;cursor:pointer;">Adicionar</button>
+        <button type="button" class="btn-secondary" id="cancelAddBtn">Cancelar</button>
+      </div>
+    </form>
+  </section>
+
+  <main id="lista"><div class="state-box"><h3>Carregando planilha…</h3></div></main>
+
+  <div class="hidden-box" id="hiddenBox"></div>
+
+  <footer class="note">Fonte dos dados: planilha do Google Sheets configurada em <code>SHEET_CSV_URL</code>. Processos adicionados ou removidos por aqui ficam salvos neste navegador.</footer>
+
+</div>
+
+<script>
+  // ============================================================
+  // COLE AQUI O LINK "PUBLICAR NA WEB" (formato CSV) DA SUA PLANILHA
+  // Google Sheets: Arquivo > Compartilhar > Publicar na web > aba
+  // "Trainees" > formato CSV > Publicar > copiar o link e colar abaixo.
+  // ============================================================
+  const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRKaGPcusc2qrzMk9xmVGNFJih2AeQ92t6g0EhVdfCLhrmSbtHi3v78Iti-834sZ01CBTdMsbLRqkND/pub?gid=1539998115&single=true&output=csv";
+
+  const STATUS_STYLE = {
+    'pendente':   { color: 'var(--amber)', bg: 'var(--amber-bg)', group: 'pendente' },
+    'inscrito':   { color: 'var(--teal)',  bg: 'var(--teal-bg)',  group: 'andamento' },
+    'em teste':   { color: 'var(--blue)',  bg: 'var(--blue-bg)',  group: 'andamento' },
+    'entrevista': { color: 'var(--blue)',  bg: 'var(--blue-bg)',  group: 'andamento' },
+    'case':       { color: 'var(--blue)',  bg: 'var(--blue-bg)',  group: 'andamento' },
+    'aguardando resultado': { color: 'var(--blue)', bg: 'var(--blue-bg)', group: 'andamento' },
+    'aprovado':   { color: 'var(--teal)',  bg: 'var(--teal-bg)',  group: 'finalizado' },
+    'reprovado':  { color: 'var(--red)',   bg: 'var(--red-bg)',   group: 'finalizado' },
+    'desistiu':   { color: 'var(--grey)',  bg: 'var(--grey-bg)',  group: 'finalizado' },
+  };
+  const FIT_COLOR = { alto: 'var(--teal)', medio: 'var(--amber)', baixo: 'var(--red)', 'a confirmar': 'var(--grey)' };
+
+  let dados = [];
+  let filtroAtual = 'todos';
+
+  function parseFlexDate(v){
+    if (!v) return null;
+    v = String(v).trim();
+    if (!v) return null;
+    let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+    m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (m){
+      let a = +m[1], b = +m[2], y = +m[3];
+      if (y < 100) y += 2000;
+      let day, month;
+      if (a > 12) { day = a; month = b; }
+      else if (b > 12) { day = b; month = a; }
+      else { day = a; month = b; }
+      return new Date(y, month - 1, day);
+    }
+    if (/^\d+(\.\d+)?$/.test(v)){
+      const serial = parseFloat(v);
+      const epoch = Date.UTC(1899, 11, 30);
+      const d = new Date(epoch + serial * 86400000);
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
+    const g = new Date(v);
+    return isNaN(g) ? null : g;
+  }
+
+  function hojeMeiaNoite(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+
+  function diasRestantes(dt){
+    if (!dt) return null;
+    return Math.round((dt - hojeMeiaNoite()) / 86400000);
+  }
+
+  function fmtDate(dt){
+    if (!dt) return '—';
+    return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function countdownHTML(dias){
+    if (dias === null) return '';
+    if (dias < 0) return `<span class="countdown closed">Encerrado há ${Math.abs(dias)}d</span>`;
+    if (dias === 0) return `<span class="countdown urgent">Hoje</span>`;
+    if (dias === 1) return `<span class="countdown urgent">Amanhã</span>`;
+    if (dias <= 3) return `<span class="countdown urgent">${dias} dias</span>`;
+    return `<span class="countdown">${dias} dias</span>`;
+  }
+
+  function normalizeRow(row){
+    const statusRaw = (row['Status'] || 'Pendente').trim();
+    const statusKey = statusRaw.toLowerCase();
+    const fitRaw = (row['Encaixe'] || 'A confirmar').trim();
+    const fitKey = fitRaw.toLowerCase();
+
+    const prazoInscricao = parseFlexDate(row['Prazo de Inscricao'] || row['Prazo de Inscrição']);
+    const prazoFase = parseFlexDate(row['Prazo da Fase']);
+    const prazoRelevante = prazoFase || prazoInscricao;
+
+    return {
+      programa: row['Programa'] || '(sem nome)',
+      encaixe: fitKey,
+      encaixeLabel: fitRaw,
+      status: STATUS_STYLE[statusKey] ? statusKey : 'pendente',
+      statusLabel: statusRaw,
+      prazoInscricao,
+      linkInscricao: row['Link de Inscricao'] || row['Link de Inscrição'] || '',
+      faseAtual: row['Fase Atual'] || '',
+      linkFase: row['Link da Fase'] || '',
+      prazoFase,
+      prazoOrdenacao: prazoRelevante,
+      notas: row['Notas'] || '',
+      _raw: row,
+    };
+  }
+
+  const SHEET_COLUMNS = ['Programa','Encaixe','Status','Prazo de Inscricao','Link de Inscricao','Fase Atual','Link da Fase','Prazo da Fase','Notas'];
+
+  function rowToTSV(raw){
+    const get = (k, alt) => {
+      const v = raw[k];
+      if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      return (alt && raw[alt]) || '';
+    };
+    return [
+      get('Programa'),
+      get('Encaixe'),
+      get('Status'),
+      get('Prazo de Inscricao', 'Prazo de Inscrição'),
+      get('Link de Inscricao', 'Link de Inscrição'),
+      get('Fase Atual'),
+      get('Link da Fase'),
+      get('Prazo da Fase'),
+      get('Notas'),
+    ].join('\t');
+  }
+
+  const OVERLAY_ADDED_KEY = 'trainee-overlay-added';
+  const OVERLAY_REMOVED_KEY = 'trainee-overlay-removed';
+
+  function loadOverlay(){
+    let added = [], removed = [];
+    try { added = JSON.parse(localStorage.getItem(OVERLAY_ADDED_KEY) || '[]'); } catch(e){}
+    try { removed = JSON.parse(localStorage.getItem(OVERLAY_REMOVED_KEY) || '[]'); } catch(e){}
+    return { added, removed };
+  }
+  function saveOverlay(){
+    localStorage.setItem(OVERLAY_ADDED_KEY, JSON.stringify(overlay.added));
+    localStorage.setItem(OVERLAY_REMOVED_KEY, JSON.stringify(overlay.removed));
+  }
+
+  let overlay = loadOverlay();
+  let dadosSheet = [];
+
+  function recombine(){
+    const removedSet = new Set(overlay.removed.map(s => s.toLowerCase()));
+    const fromSheet = dadosSheet.filter(p => !removedSet.has(p.programa.toLowerCase()));
+    const fromLocal = overlay.added.map(row => {
+      const entry = normalizeRow(row);
+      entry.isLocal = true;
+      return entry;
+    });
+    dados = fromSheet.concat(fromLocal);
+  }
+
+  function render(){
+    const lista = document.getElementById('lista');
+
+    const ordenados = [...dados].sort((a,b) => {
+      const da = a.prazoOrdenacao ? a.prazoOrdenacao.getTime() : Infinity;
+      const db = b.prazoOrdenacao ? b.prazoOrdenacao.getTime() : Infinity;
+      return da - db;
+    });
+
+    const deVal = (document.getElementById('filtroDe') || {}).value;
+    const ateVal = (document.getElementById('filtroAte') || {}).value;
+    const deDate = deVal ? new Date(deVal + 'T00:00:00') : null;
+    const ateDate = ateVal ? new Date(ateVal + 'T23:59:59') : null;
+
+    const visiveis = ordenados.filter(p => {
+      const grupo = (STATUS_STYLE[p.status] || {}).group || 'pendente';
+      if (filtroAtual !== 'todos' && grupo !== filtroAtual) return false;
+      if (deDate || ateDate){
+        if (!p.prazoOrdenacao) return false;
+        if (deDate && p.prazoOrdenacao < deDate) return false;
+        if (ateDate && p.prazoOrdenacao > ateDate) return false;
+      }
+      return true;
+    });
+
+    if (visiveis.length === 0){
+      lista.innerHTML = `<div class="state-box"><h3>Nada por aqui</h3><p>Nenhum programa nesse filtro no momento.</p></div>`;
+      return;
+    }
+
+    lista.innerHTML = visiveis.map(p => {
+      const style = STATUS_STYLE[p.status] || STATUS_STYLE['pendente'];
+      const dias = diasRestantes(p.prazoOrdenacao);
+      const fitColor = FIT_COLOR[p.encaixe] || 'var(--grey)';
+      const linkPrincipal = p.linkFase || p.linkInscricao;
+      const mostrarLinkSecundario = p.linkInscricao && p.linkFase && p.linkInscricao !== p.linkFase;
+      const nomeAttr = p.programa.replace(/"/g, '&quot;');
+
+      return `
+        <article class="entry" style="--accent:${style.color}">
+          <div class="entry-top">
+            <span class="pill" style="background:${style.bg};color:${style.color}">${p.statusLabel}</span>
+            <span class="pill fit" style="color:${fitColor}">${p.encaixeLabel}</span>
+            <div class="entry-top-right">
+              ${countdownHTML(dias)}
+              ${p.isLocal ? '<span class="local-badge">Somente aqui</span>' : ''}
+              <button class="delete-btn" data-programa="${nomeAttr}" data-local="${p.isLocal ? '1':'0'}" title="Remover" aria-label="Remover ${nomeAttr}">×</button>
+            </div>
+          </div>
+          <h2 class="entry-title">${p.programa}</h2>
+          <div class="meta-grid">
+            <div>
+              <div class="label">Fase atual</div>
+              <div class="value">${p.faseAtual || '—'}</div>
+            </div>
+            <div>
+              <div class="label">Prazo da fase</div>
+              <div class="value">${p.prazoFase ? fmtDate(p.prazoFase) : '—'}</div>
+            </div>
+            <div>
+              <div class="label">Inscrição original</div>
+              <div class="value muted">${p.prazoInscricao ? fmtDate(p.prazoInscricao) : '—'}</div>
+            </div>
+          </div>
+          ${p.notas ? `<div class="notes">${p.notas}</div>` : ''}
+          <div class="entry-footer">
+            ${linkPrincipal ? `<a class="btn-primary" href="${linkPrincipal}" target="_blank" rel="noopener">Abrir</a>` : ''}
+            ${mostrarLinkSecundario ? `<a class="link-secondary" href="${p.linkInscricao}" target="_blank" rel="noopener">Inscrição original</a>` : ''}
+            ${p.isLocal ? `<button class="link-secondary copy-row-btn" data-tsv="${encodeURIComponent(rowToTSV(p._raw))}" style="background:none;border:none;cursor:pointer;">Copiar linha para a planilha</button>` : ''}
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  function renderSummary(){
+    const total = dados.length;
+    const grupoCount = g => dados.filter(p => ((STATUS_STYLE[p.status]||{}).group) === g).length;
+    const proximo = [...dados]
+      .filter(p => ((STATUS_STYLE[p.status]||{}).group) !== 'finalizado')
+      .filter(p => p.prazoOrdenacao && diasRestantes(p.prazoOrdenacao) >= 0)
+      .sort((a,b) => a.prazoOrdenacao - b.prazoOrdenacao)[0];
+
+    document.getElementById('summary').innerHTML = `
+      <div class="stat"><span class="num">${grupoCount('pendente')}</span><span class="label">pendentes</span></div>
+      <div class="stat"><span class="num">${grupoCount('andamento')}</span><span class="label">em andamento</span></div>
+      <div class="stat"><span class="num">${total}</span><span class="label">no total</span></div>
+      <div class="stat next">
+        <span class="label">Próximo prazo</span>
+        <span class="num">${proximo ? `<strong>${proximo.programa}</strong> — ${diasRestantes(proximo.prazoOrdenacao)} dia(s)` : 'nenhum prazo futuro pendente'}</span>
+      </div>
+    `;
+  }
+
+  document.querySelectorAll('#tabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      filtroAtual = btn.dataset.filter;
+      render();
+    });
+  });
+
+  document.getElementById('filtroDe').addEventListener('change', render);
+  document.getElementById('filtroAte').addEventListener('change', render);
+  document.getElementById('limparFiltroData').addEventListener('click', () => {
+    document.getElementById('filtroDe').value = '';
+    document.getElementById('filtroAte').value = '';
+    render();
+  });
+
+  document.getElementById('addToggleBtn').addEventListener('click', () => {
+    document.getElementById('addPanel').classList.toggle('open');
+  });
+  document.getElementById('cancelAddBtn').addEventListener('click', () => {
+    document.getElementById('addForm').reset();
+    document.getElementById('addPanel').classList.remove('open');
+  });
+
+  document.getElementById('addForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const nome = (fd.get('programa') || '').trim();
+    if (!nome) return;
+    const row = {
+      'Programa': nome,
+      'Encaixe': fd.get('encaixe') || 'A confirmar',
+      'Status': fd.get('status') || 'Pendente',
+      'Prazo de Inscricao': fd.get('prazoInscricao') || '',
+      'Link de Inscricao': fd.get('linkInscricao') || '',
+      'Fase Atual': fd.get('faseAtual') || '',
+      'Link da Fase': fd.get('linkFase') || '',
+      'Prazo da Fase': fd.get('prazoFase') || '',
+      'Notas': fd.get('notas') || '',
+    };
+    overlay.added.push(row);
+    saveOverlay();
+    recombine();
+    render();
+    renderSummary();
+    renderHiddenBox();
+    e.target.reset();
+    document.getElementById('addPanel').classList.remove('open');
+  });
+
+  function renderHiddenBox(){
+    const box = document.getElementById('hiddenBox');
+    if (!overlay.removed.length){ box.innerHTML = ''; return; }
+    box.innerHTML = `
+      <button class="toggle" id="hiddenToggle">${overlay.removed.length} ocultado(s) neste navegador</button>
+      <div class="hidden-list" id="hiddenList">
+        ${overlay.removed.map(nome => `
+          <div class="hidden-item">
+            <span>${nome}</span>
+            <button data-restore="${nome.replace(/"/g,'&quot;')}">Restaurar</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    document.getElementById('hiddenToggle').addEventListener('click', () => {
+      document.getElementById('hiddenList').classList.toggle('open');
+    });
+    box.querySelectorAll('[data-restore]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nome = btn.dataset.restore;
+        overlay.removed = overlay.removed.filter(x => x !== nome);
+        saveOverlay();
+        recombine();
+        render();
+        renderSummary();
+        renderHiddenBox();
+      });
+    });
+  }
+
+  document.getElementById('lista').addEventListener('click', function(e){
+    const delBtn = e.target.closest('.delete-btn');
+    if (delBtn){
+      const nome = delBtn.dataset.programa;
+      const isLocal = delBtn.dataset.local === '1';
+      if (isLocal){
+        overlay.added = overlay.added.filter(r => (r['Programa'] || '') !== nome);
+      } else if (!overlay.removed.some(x => x.toLowerCase() === nome.toLowerCase())){
+        overlay.removed.push(nome);
+      }
+      saveOverlay();
+      recombine();
+      render();
+      renderSummary();
+      renderHiddenBox();
+      return;
+    }
+    const copyBtn = e.target.closest('.copy-row-btn');
+    if (copyBtn){
+      const text = decodeURIComponent(copyBtn.dataset.tsv);
+      const done = () => {
+        const old = copyBtn.textContent;
+        copyBtn.textContent = 'Copiado!';
+        setTimeout(() => { copyBtn.textContent = old; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(() => alert('Não consegui copiar automaticamente. Copie manualmente:\n\n' + text));
+      } else {
+        alert('Copie manualmente esta linha (cole em uma nova linha da planilha):\n\n' + text);
+      }
+      return;
+    }
+  });
+
+  function showSetupInstructions(){
+    document.getElementById('lista').innerHTML = `
+      <div class="state-box">
+        <h3>Falta conectar a planilha</h3>
+        <p>Esta página busca os dados de uma planilha do Google Sheets publicada como CSV. Para configurar:</p>
+        <ol>
+          <li>Abra sua planilha <code>pauta-trainees.xlsx</code> no Google Sheets.</li>
+          <li>Vá em <strong>Arquivo → Compartilhar → Publicar na web</strong>.</li>
+          <li>Selecione a aba <strong>Trainees</strong> e o formato <strong>CSV</strong>, depois clique em Publicar.</li>
+          <li>Copie o link gerado.</li>
+          <li>No arquivo <code>index.html</code>, substitua o valor de <code>SHEET_CSV_URL</code> por esse link.</li>
+          <li>Suba o arquivo atualizado para o GitHub.</li>
+        </ol>
+      </div>`;
+    document.getElementById('syncStatus').textContent = 'planilha não configurada';
+  }
+
+  function showError(msg){
+    document.getElementById('lista').innerHTML = `
+      <div class="state-box">
+        <h3>Não consegui carregar a planilha</h3>
+        <p>${msg}</p>
+        <p>Confira se a planilha foi publicada como CSV (Arquivo → Compartilhar → Publicar na web) e se o link em <code>SHEET_CSV_URL</code> está correto.</p>
+      </div>`;
+    document.getElementById('syncStatus').textContent = 'erro ao carregar';
+  }
+
+  function carregar(){
+    if (!SHEET_CSV_URL || SHEET_CSV_URL.indexOf('COLE_AQUI') !== -1){
+      showSetupInstructions();
+      return;
+    }
+    const btn = document.getElementById('refreshBtn');
+    btn.classList.add('spinning');
+    const bust = SHEET_CSV_URL + (SHEET_CSV_URL.includes('?') ? '&' : '?') + 'cachebust=' + Date.now();
+
+    Papa.parse(bust, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results){
+        btn.classList.remove('spinning');
+        if (!results.data || !results.data.length){
+          showError('A planilha respondeu, mas não retornou nenhuma linha de dados.');
+          return;
+        }
+        dadosSheet = results.data
+          .filter(r => r['Programa'] && r['Programa'].trim())
+          .map(normalizeRow);
+        recombine();
+        render();
+        renderSummary();
+        renderHiddenBox();
+        document.getElementById('syncStatus').textContent =
+          'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      },
+      error: function(err){
+        btn.classList.remove('spinning');
+        showError(err.message || 'Erro desconhecido ao buscar o CSV.');
+      }
+    });
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', carregar);
+
+  carregar();
+</script>
+
+</body>
+</html>
